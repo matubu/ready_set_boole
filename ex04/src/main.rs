@@ -4,8 +4,6 @@ use std::collections::BTreeMap;
 
 fn	eval_formula_it(it: &mut Rev<Chars>, vars: &BTreeMap::<char, bool>) -> bool {
 	match it.next() {
-		Some('0') => false,
-		Some('1') => true,
 		Some('!') => !eval_formula_it(it, vars),
 		Some('&') => eval_formula_it(it, vars) & eval_formula_it(it, vars),
 		Some('|') => eval_formula_it(it, vars) | eval_formula_it(it, vars),
@@ -13,7 +11,8 @@ fn	eval_formula_it(it: &mut Rev<Chars>, vars: &BTreeMap::<char, bool>) -> bool {
 		Some('>') => eval_formula_it(it, vars) <= eval_formula_it(it, vars),
 		Some('=') => eval_formula_it(it, vars) == eval_formula_it(it, vars),
 		Some(c @ 'A'..='Z') => *vars.get(&c).unwrap(),
-		_ => false
+		None => panic!("\x1B[91merror\x1B[0m end of string"),
+		_ => panic!("\x1B[91merror\x1B[0m invalid char")
 	}
 }
 
@@ -59,7 +58,6 @@ fn	print_truth_table(formula: &str) {
 }
 
 fn	main() {
-	print_truth_table("1");
 	print_truth_table("A");
 	print_truth_table("AB&C|");
 	print_truth_table("AB&C|D|");

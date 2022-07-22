@@ -11,7 +11,8 @@ fn	eval_formula_it(it: &mut Rev<Chars>) -> bool {
 		Some('^') => eval_formula_it(it) ^ eval_formula_it(it),
 		Some('>') => eval_formula_it(it) <= eval_formula_it(it),
 		Some('=') => eval_formula_it(it) == eval_formula_it(it),
-		_ => false
+		None => panic!("\x1B[91merror\x1B[0m end of string"),
+		_ => panic!("\x1B[91merror\x1B[0m invalid char")
 	}
 }
 
