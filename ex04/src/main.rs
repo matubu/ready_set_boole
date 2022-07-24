@@ -61,4 +61,7 @@ fn	main() {
 	print_truth_table("A");
 	print_truth_table("AB&C|");
 	print_truth_table("AB&C|D|");
+
+	print_truth_table("AB&CD&|");
+	print_truth_table("A!B!|C!D!|&");
 }

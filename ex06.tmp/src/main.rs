@@ -1,6 +1,21 @@
 use std::iter::Rev;
 use std::str::Chars;
 
+enum Node {
+	enum Leave {
+		Not(char),
+		Yes(char)
+	},
+	enum Branch {
+		left: Option<Node>,
+		right: Option<Node>,
+		enum op {
+			Or,
+			And
+		}
+	}
+}
+
 fn conjunctive_normal_form(formula: &str) -> String {
 	fn	fixup(it: &mut Rev<Chars>, neg: bool) -> String {
 		let and = if neg { "|" } else { "&" };
@@ -25,13 +40,68 @@ fn conjunctive_normal_form(formula: &str) -> String {
 		}
 	}
 
-	fixup(&mut formula.chars().rev(), false)
+	let mut formula = fixup(&mut formula.chars().rev(), false);
 
-	//    [[ab|]c|]
-	// -> [c[ab|]|]
-	//    [[ab|][cd|]|]
-	// -> [[ab&][cd&]|] ???
-	fn refactor()
+	// Karnaugh map
+	// fn kmap() {
+	// }
+
+	fn	every_conjunction_at_end(formula: &String) -> bool {
+		!formula.trim_end_matches('&').contains("&")
+	}
+
+	// Expand
+	//    [[ab&][cd&]|]
+	// -> [[ac|][[ad|][[bc|][bd|]&]&]&]
+	// Join
+	//    [[ab&]c&]
+	// -> [a[bc&]&]
+	// Rotation
+	//    [[ab&](c)|]
+	//    [(c)[ab&]|]
+	// -> [[a(c)|][b(c)|]&]
+
+	[ab&[cd&de&&]&]
+
+	fn	refactor(formula: &String) -> String {
+		let mut left_most_conjunction = formula.find('&').unwrap();
+		// ab&cd||
+		//   ^   ^
+		let mut parent = left_most_conjunction;
+		let mut count: usize = 0;
+
+		loop {
+			parent += 1;
+			match formula.as_bytes()[parent] as char {
+				c @ ('&' | '|') => {
+					if parent == left_most_conjunction + 1 && c == '&' {
+						// abcd&&|
+						//     ^^
+						// Cant do anything
+						// Move left_most_conjunction "pointer"
+						// abcd&&|
+						//      ^
+						left_most_conjunction = parent;
+						continue ;
+					}
+					if count < 2 {
+						break ;
+					}
+					count -= 2;
+				},
+				'A'..='Z' => count += 1,
+				_ => ()
+			}
+		};
+		println!("{} {}", left_most_conjunction, parent);
+		"".to_string()
+	}
+
+	while !every_conjunction_at_end(&formula) {
+		formula = refactor(&formula);
+	}
+
+	formula
 }
 
 fn	test(formula: &str, expected: &str) {

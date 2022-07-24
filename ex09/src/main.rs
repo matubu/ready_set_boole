@@ -22,14 +22,11 @@ fn	eval_set_it(it: &mut Rev<Chars>, sets: &Vec<Vec<i32>>) -> HashSet<i32> {
 		},
 		Some('>') => {
 			let a = eval_set_it(it, sets);
-			let b = *eval_set_it(it, sets).iter().max().unwrap_or(&i32::MIN);
-
-			a.iter().filter(|x| **x <= b).copied().collect()
+			let b = eval_set_it(it, sets);
+			b
 		},
 		Some('=') => {
-			let a = eval_set_it(it, sets);
-			let b = eval_set_it(it, sets);
-			if a == b { a } else { HashSet::new() }
+			eval_set_it(it, sets).intersection(&eval_set_it(it, sets)).copied().collect()
 		},
 		Some(c @ 'A'..='Z') => sets[c as usize - 'A' as usize].iter().copied().collect(),
 		None => panic!("\x1B[91merror\x1B[0m end of string"),
