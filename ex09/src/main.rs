@@ -20,7 +20,12 @@ fn	eval_set_it(it: &mut Rev<Chars>, sets: &Vec<Vec<i32>>) -> HashSet<i32> {
 			a.union(&b).copied().collect::<HashSet<i32>>()
 				.difference(&a.intersection(&b).copied().collect()).copied().collect()
 		},
-		// Some('>') => eval_set_it(it, sets) <= eval_set_it(it, sets),
+		Some('>') => {
+			let a = eval_set_it(it, sets);
+			let b = *eval_set_it(it, sets).iter().max().unwrap_or(&i32::MIN);
+
+			a.iter().filter(|x| **x <= b).copied().collect()
+		},
 		Some('=') => {
 			let a = eval_set_it(it, sets);
 			let b = eval_set_it(it, sets);
@@ -67,9 +72,4 @@ fn	main() {
 		vec![0, 1, 2],
 	]);
 	// []
-	
-	// TODO fix ['!', '>', '=']
-
-	// BA!&
-	// Remove all A from B ?
 }
