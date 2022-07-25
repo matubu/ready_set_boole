@@ -2,38 +2,61 @@ use std::iter::Rev;
 use std::str::Chars;
 
 fn conjunctive_normal_form(formula: &str) -> String {
+	fn	get_token(it: &mut Rev<Chars>) -> String {
+		match it.next() {
+			Some('!') => format!("{}!", get_token(it)),
+			Some('&') => format!("{}{}&", get_token(it), get_token(it)),
+			Some('|') => format!("{}{}|", get_token(it), get_token(it)),
+			Some(c @ 'A'..='Z') => c.to_string(),
+			_ => "".to_string()
+		}
+	}
+
 	fn	fixup(it: &mut Rev<Chars>, neg: bool) -> String {
 		fn	fixup_or(a: String, b: String) -> String {
+			fn fixup_split_and(s: String) -> (String, Vec<String>) {
+				let first_and = s.find("&").unwrap();
+				let ands = &s[first_and..];
+				let tokens_it = &mut s[..first_and].chars().rev();
+				let mut tokens = Vec::<String>::new();
+
+				for _ in 0..ands.len()+1 {
+					let token = get_token(tokens_it);
+					tokens.push(token);
+				}
+
+				(ands.to_string(), tokens)
+			}
+
 			// AB|   CDE&&   |
 			// Move all & to then end
 			// Apply | to every token from b
 			// AB|C|   AB|D|   AB|E|   &&
 			fn	fixup_or_single_side(a: String, b: String) -> String {
-				fn	get_token(it: &mut Rev<Chars>) -> String {
-					match it.next() {
-						Some('!') => format!("{}!", get_token(it)),
-						Some('&') => format!("{}{}&", get_token(it), get_token(it)),
-						Some('|') => format!("{}{}|", get_token(it), get_token(it)),
-						Some(c @ 'A'..='Z') => c.to_string(),
-						_ => "".to_string()
-					}
-				}
-
 				let mut tmp = String::new();
 
-				let first_and = b.find("&").unwrap();
-				let ands = &b[first_and..];
+				let (ands, tokens) = fixup_split_and(b);
 
-				let tokens = &b[..first_and];
-
-				let tokens_it = &mut tokens.chars().rev();
-
-				for _ in 0..ands.len()+1 {
-					let token = get_token(tokens_it);
+				for token in tokens {
 					tmp += &format!("{}{}|", token, a);
 				}
 
 				format!("{tmp}{ands}")
+			}
+
+			fn	fixup_or_double_side(a: String, b: String) -> String {
+				let mut tmp = String::new();
+
+				let (ands_a, tokens_a) = fixup_split_and(a);
+				let (ands_b, tokens_b) = fixup_split_and(b);
+
+				for token_a in &tokens_a {
+					for token_b in &tokens_b {
+						tmp += &format!("{}{}|", token_a, token_b);
+					}
+				}
+
+				format!("{tmp}{ands_a}{ands_b}")
 			}
 
 			match (a.ends_with("&"), b.ends_with("&")) {
@@ -54,9 +77,7 @@ fn conjunctive_normal_form(formula: &str) -> String {
 				// -> [[ac|][[ad|][[bc|][bd|]&]&]&]
 				//    [[abc&&][def&&]|]
 				// -> ??
-				// (true, true) => format!("{1}{0}&", a, b),
-
-				_ => "".to_string()
+				(true, true) => fixup_or_double_side(a, b),
 			}
 		}
 
@@ -119,4 +140,6 @@ fn	main() {
 	test("AB&!C!|", "A!B!C!||");
 	test("ABC&&DEF&&&", "DEFABC&&&&&");
 	test("AB|CDE&&|", "");
+	test("AB&CD&|", "");
+	test("ABC&&DEF&&|", "");
 }
