@@ -1,38 +1,96 @@
 use std::iter::Rev;
 use std::str::Chars;
 
-enum Node {
-	enum Leave {
-		Not(char),
-		Yes(char)
-	},
-	enum Branch {
-		left: Option<Node>,
-		right: Option<Node>,
-		enum op {
-			Or,
-			And
-		}
-	}
-}
-
 fn conjunctive_normal_form(formula: &str) -> String {
 	fn	fixup(it: &mut Rev<Chars>, neg: bool) -> String {
-		let and = if neg { "|" } else { "&" };
-		let or = if neg { "&" } else { "|" };
+		fn	fixup_or(a: String, b: String) -> String {
+			// AB|   CDE&&   |
+			// Move all & to then end
+			// Apply | to every token from b
+			// AB|C|   AB|D|   AB|E|   &&
+			fn	fixup_or_single_side(a: String, b: String) -> String {
+				fn	get_token(it: &mut Rev<Chars>) -> String {
+					match it.next() {
+						Some('!') => format!("{}!", get_token(it)),
+						Some('&') => format!("{}{}&", get_token(it), get_token(it)),
+						Some('|') => format!("{}{}|", get_token(it), get_token(it)),
+						Some(c @ 'A'..='Z') => c.to_string(),
+						_ => "".to_string()
+					}
+				}
+
+				let mut tmp = String::new();
+
+				let first_and = b.find("&").unwrap();
+				let ands = &b[first_and..];
+
+				let tokens = &b[..first_and];
+
+				let tokens_it = &mut tokens.chars().rev();
+
+				for _ in 0..ands.len()+1 {
+					let token = get_token(tokens_it);
+					tmp += &format!("{}{}|", token, a);
+				}
+
+				format!("{tmp}{ands}")
+			}
+
+			match (a.ends_with("&"), b.ends_with("&")) {
+				// Easy
+				(false, false) => format!("{}{}|", b, a),
+
+				// Single side
+				//    [[ab&](c)|]
+				// or [(c)[ab&]|]
+				// -> [[ac|][bc|]&]
+				//    [(e)[a[b[cd&]&]&]|]
+				// -> [ae|[be|[ce|de|&]&]&]
+				(true, false) => fixup_or_single_side(b, a),
+				(false, true) => fixup_or_single_side(a, b),
+
+				// Double side
+				//    [[ab&][cd&]|]
+				// -> [[ac|][[ad|][[bc|][bd|]&]&]&]
+				//    [[abc&&][def&&]|]
+				// -> ??
+				// (true, true) => format!("{1}{0}&", a, b),
+
+				_ => "".to_string()
+			}
+		}
+
+		fn	fixup_and(a: String, b: String) -> String {
+			match (a.ends_with("&"), b.ends_with("&")) {
+				// Easy
+				(false, true) => format!("{}{}&", a, b),
+				(false, false)
+				| (true, false) => format!("{}{}&", b, a),
+
+				// Insert
+				// [[abc&&][def&&]&]
+				// [[def[abc&&]&&]&]
+				(true, true) => {
+					let mut tmp = a.clone();
+					tmp.insert_str(a.find("&").unwrap(), &b);
+					format!("{}&", tmp)
+				}
+			}
+		}
+
+		let and = |a, b| if neg { fixup_or(a, b) } else { fixup_and(a, b) };
+		let or = |a, b| if neg { fixup_and(a, b) } else { fixup_or(a, b) };
 
 		match it.next() {
 			Some('!') => fixup(it, !neg),
-			Some('&') => format!("{1}{0}{and}", fixup(it, neg), fixup(it, neg)),
-			Some('|') => format!("{1}{0}{or}", fixup(it, neg), fixup(it, neg)),
-			Some('^') => format!("{1}{0}{and}", fixup(it, neg), fixup(it, !neg)),
-			Some('>') => format!("{1}{0}{or}", fixup(it, neg), fixup(it, !neg)),
+			Some('&') => and(fixup(it, neg), fixup(it, neg)),
+			Some('|') => or(fixup(it, neg), fixup(it, neg)),
+			Some('^') => and(fixup(it, neg), fixup(it, !neg)),
+			Some('>') => or(fixup(it, neg), fixup(it, !neg)),
 			Some('=') => {
 				let copy_it = &mut (*it).clone();
-				format!("{1}{0}{and}{2}{3}{and}{or}",
-					fixup(it, neg), fixup(it, neg),
-					fixup(copy_it, !neg), fixup(copy_it, !neg)
-				)
+				or(and(fixup(it, neg), fixup(it, neg)),
+					and(fixup(copy_it, !neg), fixup(copy_it, !neg)))
 			},
 			Some(c @ 'A'..='Z') => format!("{}{op}", c, op=if neg { "!" } else { "" }),
 			None => panic!("\x1B[91merror\x1B[0m end of string"),
@@ -40,68 +98,11 @@ fn conjunctive_normal_form(formula: &str) -> String {
 		}
 	}
 
-	let mut formula = fixup(&mut formula.chars().rev(), false);
-
 	// Karnaugh map
 	// fn kmap() {
 	// }
 
-	fn	every_conjunction_at_end(formula: &String) -> bool {
-		!formula.trim_end_matches('&').contains("&")
-	}
-
-	// Expand
-	//    [[ab&][cd&]|]
-	// -> [[ac|][[ad|][[bc|][bd|]&]&]&]
-	// Join
-	//    [[ab&]c&]
-	// -> [a[bc&]&]
-	// Rotation
-	//    [[ab&](c)|]
-	//    [(c)[ab&]|]
-	// -> [[a(c)|][b(c)|]&]
-
-	[ab&[cd&de&&]&]
-
-	fn	refactor(formula: &String) -> String {
-		let mut left_most_conjunction = formula.find('&').unwrap();
-		// ab&cd||
-		//   ^   ^
-		let mut parent = left_most_conjunction;
-		let mut count: usize = 0;
-
-		loop {
-			parent += 1;
-			match formula.as_bytes()[parent] as char {
-				c @ ('&' | '|') => {
-					if parent == left_most_conjunction + 1 && c == '&' {
-						// abcd&&|
-						//     ^^
-						// Cant do anything
-						// Move left_most_conjunction "pointer"
-						// abcd&&|
-						//      ^
-						left_most_conjunction = parent;
-						continue ;
-					}
-					if count < 2 {
-						break ;
-					}
-					count -= 2;
-				},
-				'A'..='Z' => count += 1,
-				_ => ()
-			}
-		};
-		println!("{} {}", left_most_conjunction, parent);
-		"".to_string()
-	}
-
-	while !every_conjunction_at_end(&formula) {
-		formula = refactor(&formula);
-	}
-
-	formula
+	fixup(&mut formula.chars().rev(), false)
 }
 
 fn	test(formula: &str, expected: &str) {
@@ -116,4 +117,6 @@ fn	main() {
 	test("AB&C&D&", "ABCD&&&");
 	test("AB&!C!|", "A!B!C!||");
 	test("AB&!C!|", "A!B!C!||");
+	test("ABC&&DEF&&&", "DEFABC&&&&&");
+	test("AB|CDE&&|", "");
 }
